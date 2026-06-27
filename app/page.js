@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { formatKoreanMoney, formatPyeong } from "@/lib/formatters";  // ⬅️ 이 줄 추가
 
 export default function Home() {
   const router = useRouter();
@@ -176,6 +177,12 @@ export default function Home() {
         officeName: brokerData?.office_name || formOfficeName || "",
         phone: brokerData?.phone || formPhone || "",
       };
+        // 금액/면적 변환
+const formattedDeposit = formatKoreanMoney(deposit);
+const formattedRent = formatKoreanMoney(monthlyRent);
+const formattedMaintenance = formatKoreanMoney(maintenanceFee);
+const formattedSupplyArea = formatPyeong(supplyArea);
+const formattedExclusiveArea = formatPyeong(exclusiveArea);
 
       // propertyData 동적 생성 (값이 있는 것만)
       const propertyData = {
