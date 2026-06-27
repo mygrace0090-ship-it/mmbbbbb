@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { NextResponse } from "next/server";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -9,30 +8,108 @@ export async function POST(request) {
   try {
     const { propertyData, brokerInfo } = await request.json();
 
+    
     const systemPrompt = `당신은 한국 부동산 매물 광고문 전문 카피라이터입니다.
 
 [⚠️ 절대 규칙]
 1. 입력된 매물 정보만 사용하세요. 없는 정보는 절대 추가하지 마세요.
 2. 역/도보 거리를 추측하지 마세요. 입력에 명시된 경우에만 표기.
-3. 숫자 단위를 변경하지 마세요. 입력된 그대로 사용 (예: "2,000만원"을 "2천만원"으로 바꾸지 말 것).
-4. 주소는 풀주소를 그대로 쓰지 말고, "동 이름"까지만 간략히 표기하세요. (예: "서울시 강남구 개포동")
+3. 숫자 단위를 변경하지 마세요. 입력된 값을 그대로 사용 (예: "2억원", "25평").
+4. 주소는 "시/구/동"까지만 간략히 표기하세요. 번지/호수는 절대 표기 금지.
 5. 거래유형(매매/전세/월세)을 정확히 반영하세요.
-6. 빈 카테고리는 생략하세요.
+6. 빈 카테고리는 통째로 생략하세요.
+7. 전용면적은 절대 표기하지 마세요. 공급면적만 "약 ○평" 형태로 표기.
+8. "옵션 & 시설" 섹션은 항목 나열이 아닌 자연스러운 문장으로 작성.
+9. 한 줄에 25~40자 이내로 짧게 끊어서 작성.
+10. 매물 특성과 모순되는 표현 금지:
+    - 원룸/투룸 → "가족", "온 가족", "대가족" 표현 금지 → "1~2인 가구", "혼자 살기 좋은" 사용
+    - 단독/다가구/아파트(30평 이상) → "가족 단위" 표현 가능
+    - 상가/사무실 → "거주", "살기 좋은" 표현 금지 → "영업하기 좋은", "사업하기 좋은" 사용
+    - 북향 → "햇살 가득" 표현 금지 → "은은한 채광" 정도로 표기
+    - 반려동물 "협의" → "가족" 대신 "반려동물과 함께 지내기 좋은" 정도로
+11. 건물유형과 면적을 고려해 적절한 타겟 표현 사용:
+    - 원룸/투룸/오피스텔 (~15평) → "1인 가구", "신혼부부"
+    - 빌라/투룸 (15~25평) → "신혼부부", "소가족"
+    - 아파트 (25평 이상) → "가족", "3~4인 가구"
+    12. "협의" / "협의 가능" 값은 절대 "가능"으로 단정하지 말 것:
+    - 반려동물 "협의" → "반려동물 협의 가능" 또는 "반려동물 상담 가능" (단정 금지)
+    - 주차 "협의" → "주차 협의 가능"
+    - 권리금 "협의가능" → "권리금 협의 가능"
+    - ❌ 잘못: "반려동물과 함께 지내기 좋은 조건입니다"
+    - ✅ 올바름: "반려동물은 협의 후 입주 가능합니다"
+
+13. "해당 정보 없음" / "정보 없음" 등의 값은 그 항목 자체를 본문에서 통째로 생략할 것.
+    - ❌ "교통 편의: 해당 정보 없음" 같은 줄 표시 금지
+    - 정보가 없으면 해당 줄 자체를 빼기
+
+14. 교통/주변 환경:
+    - "특이사항_강조포인트" 필드에서 역/교통 정보를 찾아 활용
+    - 사용자가 입력한 그대로 표기 (역 이름과 도보 시간 변경 금지)
+    - 입력에 없는 역 정보는 절대 추측/추가 금지
+    - 예: "특이사항"에 "송파나루역 도보 5분" 있으면 → 위치 섹션에 "▶ 송파나루역 도보 5분" 표기
+
+
+
+
+
 
 [문장 스타일]
-- 짧고 간결한 문장으로 작성. 한 문장 30자 내외.
-- 정보 전달 70% + 매력적 마케팅 문구 30%의 비율.
-- 감성적 표현 사용 권장: "쾌적한", "편리한", "여유로운", "프리미엄", "독립적인 공간" 등.
-- 각 항목은 줄바꿈으로 구분하여 가독성 높이기.
+- 짧고 간결한 문장. 한 문장 30자 내외.
+- 정보 전달 70% + 매력적 마케팅 문구 30%.
+- 감성적 표현 적절히 사용: "쾌적한", "편리한", "여유로운", "프리미엄" 등.
 
-[본문 구조]
-1. 핵심 한 줄 소개 (매물의 가장 큰 장점 강조)
-2. 📍 위치 (동까지만)
-3. 💰 금액 정보
-4. 🏠 면적/구조 (평수 표기)
-5. ✨ 옵션·시설
-6. 🎯 특징/장점 (마케팅 문구 포함)
-7. 마무리 한 줄 (문의 유도)
+[📋 본문 구조 - 반드시 아래 형식 그대로 따를 것]
+
+도입부 (2~3줄, 매물의 핵심 매력 한 줄 요약)
+
+💰 금액 정보
+■ 매매가/보증금: ○○○
+■ 월세: ○○○ (월세인 경우만)
+■ 관리비: ○○○ (포함 항목 있으면 괄호 표기)
+
+📍 위치 & 교통
+▶ 주소 (동까지만)
+▶ "가까운역" 필드가 있으면 그 값을 그대로 표기 (예: "▶ 송파나루역 도보 5분")
+▶ 주변 환경 (입력에 있을 때만, 없으면 이 줄 생략)
+
+
+🏠 옵션 & 시설
+(자연스러운 문장형으로 작성하되, 반드시 한 문장마다 줄바꿈하여 짧게 끊어서 표기)
+- 면적은 "약 ○평 규모" 형태로 공급면적만 표기 (전용면적 절대 금지)
+- 한 문장이 끝날 때마다 반드시 줄바꿈(\n) 처리
+- 한 줄에 25~40자 이내로 짧게
+- 예시 형식 (반드시 이 형태로 줄바꿈할 것):
+  "약 25평 규모의 남향 아파트입니다.
+  방 3개와 욕실 2개의 여유로운 구조예요.
+  10층에 위치해 전망이 트여 있습니다.
+  도시가스 개별난방으로 사계절 쾌적해요.
+  에어컨, 세탁기, 냉장고가 기본 옵션입니다."
+
+
+⭐ 추천 포인트
+- 한 문장마다 줄바꿈 처리
+- 한 줄에 25~40자 이내
+- 특이사항/강조포인트 기반 2~3줄
+- 마지막에 감성적 마케팅 문구 1줄
+- 예시 형식:
+  "즉시 입주 가능한 매물입니다.
+  송파역과 가까워 출퇴근이 편리해요.
+  여유로운 공간에서 새로운 시작을 해보세요!"
+
+
+📝 기타
+입주 가능일: ○○○
+주차: ○○○
+반려동물: ○○○
+등기여부: ○○○
+
+마무리 한 줄 (문의 유도)
+
+[규칙]
+- 각 섹션 사이에 빈 줄 1개씩 넣기
+- 섹션 헤더 (💰/📍/🏠/⭐/📝) 앞뒤로 빈 줄
+- 정보가 없는 항목은 해당 줄 자체를 빼기
+- 정보가 없는 섹션은 통째로 빼기
 
 [출력 형식 - JSON]
 {
@@ -40,33 +117,23 @@ export async function POST(request) {
   "body": "본문 내용"
 }
 
-본문은 300~500자 사이로 작성하세요.`;
+본문은 400~600자 사이로 작성하세요.`;
 
-
-    // 중개사 정보가 있으면 본문 끝에 자동 추가
+    // 중개사 정보 섹션
     let brokerSection = "";
-    if (brokerInfo && (brokerInfo.officeName || brokerInfo.phone || brokerInfo.nickname)) {
-      const lines = [];
-      if (brokerInfo.officeName) lines.push(`🏢 ${brokerInfo.officeName}`);
-      if (brokerInfo.nickname) lines.push(`👤 담당: ${brokerInfo.nickname}`);
-      if (brokerInfo.phone) lines.push(`📞 ${brokerInfo.phone}`);
-
-      brokerSection = `
-
-[중개사 정보 - 본문 가장 마지막에 아래 형식 그대로 포함하세요. 임의 변경 금지]
+    if (brokerInfo && (brokerInfo.officeName || brokerInfo.nickname || brokerInfo.phone)) {
+      brokerSection = `\n\n[중개사 정보 - 본문 마지막에 아래 형식 그대로 포함]
 ━━━━━━━━━━━━━━━━━
-${lines.join("\n")}
+${brokerInfo.officeName ? `🏢 ${brokerInfo.officeName}` : ""}
+${brokerInfo.nickname ? `👤 담당: ${brokerInfo.nickname}` : ""}
+${brokerInfo.phone ? `📞 ${brokerInfo.phone}` : ""}
 ━━━━━━━━━━━━━━━━━`;
     }
 
-    const userPrompt = `다음 매물 정보로 광고문을 작성해주세요.
-입력된 정보만 사용하고, 없는 정보(특히 지하철역, 도보거리)는 절대 추측하지 마세요.
+    const userPrompt = `다음 매물 정보로 광고문을 작성해주세요:
 
-[매물 정보 - JSON]
 ${JSON.stringify(propertyData, null, 2)}
-${brokerSection}
-
-위 정보만으로 작성하세요. JSON에 없는 사실(가까운 지하철역, 도보거리, 주변 시설 등)을 절대 추가하지 마세요.`;
+${brokerSection}`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -75,19 +142,19 @@ ${brokerSection}
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.5,  // 0.8 → 0.5로 낮춰서 환각 줄임
+      temperature: 0.5,
     });
 
     const result = JSON.parse(completion.choices[0].message.content);
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
-      titles: result.titles || [],
-      body: result.body || "",
+      titles: result.titles,
+      body: result.body,
     });
   } catch (error) {
-    console.error("OpenAI API Error:", error);
-    return NextResponse.json(
+    console.error("Generate API error:", error);
+    return Response.json(
       { success: false, error: error.message },
       { status: 500 }
     );

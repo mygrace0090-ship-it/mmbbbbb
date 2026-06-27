@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { formatKoreanMoney, formatPyeong } from "@/lib/formatters";  // ⬅️ 이 줄 추가
+import { formatKoreanMoneyFromMan, formatPyeong } from "@/lib/formatters";
+
 
 export default function Home() {
   const router = useRouter();
@@ -177,32 +178,47 @@ export default function Home() {
         officeName: brokerData?.office_name || formOfficeName || "",
         phone: brokerData?.phone || formPhone || "",
       };
-        // 금액/면적 변환
-const formattedDeposit = formatKoreanMoney(deposit);
-const formattedRent = formatKoreanMoney(monthlyRent);
-const formattedMaintenance = formatKoreanMoney(maintenanceFee);
-const formattedSupplyArea = formatPyeong(supplyArea);
-const formattedExclusiveArea = formatPyeong(exclusiveArea);
+        
 
       // propertyData 동적 생성 (값이 있는 것만)
-      const propertyData = {
-        매물종류: propertyKind,
-        거래유형: dealType,
-        주소: address + (addressDetail ? ` ${addressDetail}` : ""),
-      };
+      // 주소를 "시/구/동"까지만 자르기 (번지/호수 제거)
+const trimAddress = (fullAddress) => {
+  if (!fullAddress) return "";
+  // "서울 송파구 가락로 6" → "서울 송파구 가락동" 형태로
+  // 도로명 주소에서 "로/길 + 숫자" 패턴 제거
+  let trimmed = fullAddress.split(" ").slice(0, 3).join(" ");
+  // 숫자가 포함된 마지막 단어는 제거 (예: "가락로 6" → "가락로")
+  const parts = trimmed.split(" ");
+  if (parts.length >= 3 && /\d/.test(parts[parts.length - 1])) {
+    parts.pop();
+    trimmed = parts.join(" ");
+  }
+  return trimmed;
+};
 
-      if (propertyKind === "주택") {
+const propertyData = {
+  매물종류: propertyKind,
+  거래유형: dealType,
+  주소: trimAddress(address),  // ← 풀주소 대신 자른 주소만 전달
+};
+
+
+              if (propertyKind === "주택") {
         if (buildingType) propertyData.건물유형 = buildingType;
         if (direction) propertyData.방향 = direction;
-        if (exclusiveArea) propertyData.전용면적 = `${exclusiveArea}㎡`;
-        if (supplyArea) propertyData.공급면적 = `${supplyArea}㎡`;
+        // 면적 → 평수로 변환
+        if (exclusiveArea) propertyData.전용면적 = formatPyeong(exclusiveArea);
+        if (supplyArea) propertyData.공급면적 = formatPyeong(supplyArea);
         if (currentFloor && totalFloor) propertyData.층수 = `${currentFloor}층 / ${totalFloor}층`;
         else if (currentFloor) propertyData.층수 = `${currentFloor}층`;
         if (roomCount) propertyData.방개수 = `${roomCount}개`;
         if (bathroomCount) propertyData.욕실개수 = `${bathroomCount}개`;
-        if (deposit) propertyData.보증금 = `${deposit}만원`;
-        if (monthlyRent && dealType !== "매매") propertyData.월세 = `${monthlyRent}만원`;
-        if (maintenanceFee) propertyData.관리비 = `${maintenanceFee}만원`;
+        // 금액 → 한글 단위 변환 (입력값은 만원 단위)
+        if (deposit) {
+          propertyData[dealType === "매매" ? "매매가" : "보증금"] = formatKoreanMoneyFromMan(deposit);
+        }
+        if (monthlyRent && dealType !== "매매") propertyData.월세 = formatKoreanMoneyFromMan(monthlyRent);
+        if (maintenanceFee) propertyData.관리비 = formatKoreanMoneyFromMan(maintenanceFee);
         if (moveInDate) propertyData.입주가능일 = moveInDate;
         if (heatingType) propertyData.난방방식 = heatingType;
         propertyData.주차 = housingParking;
@@ -210,17 +226,18 @@ const formattedExclusiveArea = formatPyeong(exclusiveArea);
         if (selectedHouseOptions.length > 0) propertyData.기본옵션 = selectedHouseOptions;
       }
 
+
       if (propertyKind === "상가") {
         propertyData.업종_대분류 = bizMajor;
         propertyData.업종_중분류 = bizMinor;
         if (recommendBiz) propertyData.추천업종 = recommendBiz;
-        if (shopExclusiveArea) propertyData.전용면적 = `${shopExclusiveArea}㎡`;
-        if (shopSupplyArea) propertyData.공급면적 = `${shopSupplyArea}㎡`;
+        if (shopExclusiveArea) propertyData.전용면적 = formatPyeong(shopExclusiveArea);
+        if (shopSupplyArea) propertyData.공급면적 = formatPyeong(shopSupplyArea);
         if (shopCurrentFloor && shopTotalFloor) propertyData.층수 = `${shopCurrentFloor}층 / ${shopTotalFloor}층`;
         else if (shopCurrentFloor) propertyData.층수 = `${shopCurrentFloor}층`;
-        if (shopDeposit) propertyData.보증금 = `${shopDeposit}만원`;
-        if (shopMonthlyRent) propertyData.월세 = `${shopMonthlyRent}만원`;
-        propertyData.권리금 = premiumStatus === "있음" && premiumAmount ? `${premiumAmount}만원` : premiumStatus;
+        if (shopDeposit) propertyData.보증금 = formatKoreanMoneyFromMan(shopDeposit);
+        if (shopMonthlyRent) propertyData.월세 = formatKoreanMoneyFromMan(shopMonthlyRent);
+        if (shopMaintenanceFee) propertyData.관리비 = formatKoreanMoneyFromMan(shopMaintenanceFee);
         if (maintenanceStatus === "있음") {
           if (shopMaintenanceFee) propertyData.관리비 = `${shopMaintenanceFee}만원`;
           if (selectedMaintenance.length > 0) propertyData.관리비_포함항목 = selectedMaintenance;
@@ -1060,11 +1077,12 @@ const formattedExclusiveArea = formatPyeong(exclusiveArea);
           <div className="section-card">
             <label className="label-base">매물 특이사항 / 강조 포인트</label>
             <textarea
-              className="input-base min-h-[100px] resize-y"
-              placeholder="예: 리모델링 완료, 역세권 도보 3분, 학군 우수, 채광 좋음 등"
-              value={features}
-              onChange={(e) => setFeatures(e.target.value)}
-            />
+  className="input-base min-h-[100px] resize-y"
+  placeholder="📍 교통편: 송파나루역 도보 5분, 강남역 차로 10분&#10;🏫 학군: 잠실초/중 도보 5분, 학원가 인접&#10;✨ 특징: 리모델링 완료, 채광 우수, 풀옵션&#10;💡 주변환경: 마트 도보 3분, 공원 인접"
+  value={features}
+  onChange={(e) => setFeatures(e.target.value)}
+/>
+
           </div>
 
           {/* 중개사 정보 (마이페이지 우선, 비어 있으면 여기서) */}
