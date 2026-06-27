@@ -25,6 +25,9 @@ const [petAllowed, setPetAllowed] = useState("협의");
 
   // 주소
   const [address, setAddress] = useState("");
+  // 매물 특이사항 / 강조 포인트
+const [features, setFeatures] = useState("");
+
 
   // 상가 - 업종 대/중분류
   const businessCategories = {
@@ -171,6 +174,7 @@ const [petAllowed, setPetAllowed] = useState("협의");
           입주가능일: "즉시 입주",
           특이사항: "올수리, 풀옵션, 채광 좋음",
         }),
+        ...(features && { 특이사항_강조포인트: features }),
       };
 
       const response = await fetch("/api/generate", {
@@ -873,7 +877,10 @@ const [petAllowed, setPetAllowed] = useState("협의");
             <textarea
               className="input-base min-h-[100px] resize-y"
               placeholder="예: 리모델링 완료, 역세권 도보 3분, 학군 우수, 채광 좋음 등"
+              value={features}
+              onChange={(e) => setFeatures(e.target.value)}
             />
+
           </div>
 
           {/* 중개사 정보 */}
